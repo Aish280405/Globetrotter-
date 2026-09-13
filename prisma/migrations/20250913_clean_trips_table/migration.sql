@@ -1,0 +1,13 @@
+-- Remove trip detail columns that belong in trip_concierge
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "accommodation" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "budget" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "emergency_contacts" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "interests" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "itinerary" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "packing_list" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "plan_summary" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "special_requests" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "total_cost" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "transportation" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "travel_style" CASCADE;
+ALTER TABLE "trips" DROP COLUMN IF EXISTS "travel_tips" CASCADE;

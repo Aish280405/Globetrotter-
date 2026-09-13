@@ -63,7 +63,7 @@ export async function generateNotificationsForTrip(tripId: string) {
       notifications.push({
         tripId,
         phoneNumber: trip.user.email,
-        messageType: "logistics",
+        messageType: "LOGISTICS",
         content:
           notificationTemplates.checkin_tomorrow,
       });
@@ -74,7 +74,7 @@ export async function generateNotificationsForTrip(tripId: string) {
       notifications.push({
         tripId,
         phoneNumber: trip.user.email,
-        messageType: "logistics",
+        messageType: "LOGISTICS",
         content: notificationTemplates.checkin_today,
       });
     }
@@ -91,7 +91,7 @@ export async function generateNotificationsForTrip(tripId: string) {
         notifications.push({
           tripId,
           phoneNumber: trip.user.email,
-          messageType: "event",
+          messageType: "EVENT",
           content: notificationTemplates.event_weekend,
         });
       }
@@ -106,7 +106,7 @@ export async function generateNotificationsForTrip(tripId: string) {
       notifications.push({
         tripId,
         phoneNumber: trip.user.email,
-        messageType: "tip",
+        messageType: "TIP",
         content: tip,
       });
     }

@@ -1,129 +1,138 @@
 "use client"
 
-import Image from "next/image"
-import { Highlighter } from "@/components/magicui/highlighter";
 import { Globe } from "@/components/magicui/globe";
-import Link from "next/link"
-import { Smartphone,Earth, IndianRupee, Shield, Sparkles, Check, ArrowRight, Phone, LucideIcon } from "lucide-react"
+import { Highlighter } from "@/components/magicui/highlighter";
+import { Sparkles, MapPin, Brain, CalendarDays, MessageSquare, ArrowRight, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { useState, useRef, useEffect, FC } from 'react';
+import { Card, CardContent } from "@/components/ui/card"
+import { useClerk, SignedIn, SignedOut } from "@clerk/nextjs"
+import Link from "next/link"
+import { FC, useRef, useState, useEffect } from 'react';
 
-// A custom hook to detect if an element is in the viewport
-// We specify the type for the ref, which can be any HTMLElement, and the options.
 function useInView<T extends HTMLElement = HTMLDivElement>(options: IntersectionObserverInit = {}) {
-  const [inView, setInView] = useState<boolean>(false);
+  const [inView, setInView] = useState(false);
   const ref = useRef<T | null>(null);
-
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
-      // Once the element is in view, set the state and disconnect
-      if (entry.isIntersecting) {
-        setInView(true);
-        observer.disconnect();
-      }
+      if (entry.isIntersecting) { setInView(true); observer.disconnect(); }
     }, options);
-
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
-
-    // Cleanup function to disconnect the observer when the component unmounts
-    return () => {
-      if (ref.current) {
-        observer.disconnect();
-      }
-    };
-  }, [options, ref]);
-
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
   return [ref, inView] as const;
 }
 
-// Define the component using FC (Functional Component) from React
-const Home: FC = () => {
-  return (
-    <div className="font-sans">
-      <main>
-        <HeroSection />
-        <BenefitsSection />
-        <BigPictureSection />
-        <SpecsSection />
-        <TestimonialSection />
-      </main>
-      <SiteFooter />
-    </div>
-  )
-}
+const Home: FC = () => (
+  <div className="font-sans">
+    <HeroSection />
+    <FeaturesSection />
+    <HowItWorksSection />
+    <CtaSection />
+    <SiteFooter />
+  </div>
+)
 
 const HeroSection: FC = () => {
+  const { openSignIn } = useClerk()
   return (
-    <section className="relative">
-      <div className="mx-auto max-w-6xl px-4 pb-10 pt-10 sm:px-6 sm:pb-16 sm:pt-14">
-        <h1 className="text-center font-serif text-[clamp(40px,7vw,96px)] leading-[0.9] tracking-tight">
-          Traveling Carefree
-        </h1>
-        <div className="relative mt-10 sm:mt-14">
-          {/* green rounded backdrop */}
-          <div className="absolute left-1/2 top-1/2 -z-10 h-[180px] w-[min(100%,900px)] -translate-x-1/2 -translate-y-1/2 rounded-3xl bg-[#8E9C78] sm:h-[220px]" />
-          {/* tablet-like visual */}
-          <div className="mx-auto w-full max-w-4xl overflow-hidden rounded-[18px] border-[6px] border-black/70 shadow-2xl">
-            <div className="relative aspect-[16/9] w-full">
-              <div className="absolute inset-0 grid place-items-center">
-                <Globe />
-              </div>
+    <section className="border-b">
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+        <div className="flex flex-col md:flex-row md:items-center gap-12">
+
+          {/* Left — Text */}
+          <div className="flex-1 flex flex-col gap-6">
+            <Badge variant="secondary" className="w-fit">AI-Powered Travel Planning</Badge>
+            <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl lg:text-6xl">
+              Plan smarter trips with{" "}
+              <span className="text-primary">GlobeTrotter</span>
+            </h1>
+            <p className="text-lg text-muted-foreground leading-relaxed max-w-lg">
+              Generate complete itineraries, get real-time trip updates, chat with your AI concierge, and explore destinations — all in one place.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <SignedOut>
+                <Button size="lg" className="rounded-full px-8"
+                  onClick={() => openSignIn({ redirectUrl: `${window.location.origin}/auth-redirect` })}>
+                  Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </SignedOut>
+              <SignedIn>
+                <Link href="/concierge">
+                  <Button size="lg" className="rounded-full px-8">
+                    Open App <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </SignedIn>
+            </div>
+            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-1"><Check className="h-4 w-4 text-green-500" /> Free to start</span>
+              <span className="flex items-center gap-1"><Check className="h-4 w-4 text-green-500" /> AI-generated plans</span>
+              <span className="flex items-center gap-1"><Check className="h-4 w-4 text-green-500" /> Trip notifications</span>
             </div>
           </div>
+
+          {/* Right — Globe */}
+          <div className="flex-shrink-0 w-full md:w-[560px] h-[560px] relative">
+            <Globe />
+          </div>
+
         </div>
       </div>
     </section>
   )
 }
 
-// Define the type for each item in the benefits array
-interface BenefitItem {
-  icon: LucideIcon;
-  title: string;
-  body: string;
-}
-
-const BenefitsSection: FC = () => {
-  const items: BenefitItem[] = [
-    { icon: Sparkles, title: "Amplify plans with AI", body: "Unlock relaxing trips with comprehensive plans made by AI, with chatbot and trip summaries" },
-    { icon: Earth, title: "Explore any part of the world", body: "Look for whats waiting for you in this world." },
-    { icon: IndianRupee, title: "Smart budgeting", body: "Plan your trip, to make it happen all under your budget" },
-    { icon: Shield, title: "Your Privacy, our priority", body: "We priorities your experience with utmost respect for your privacy" },
+const FeaturesSection: FC = () => {
+  const [ref, inView] = useInView<HTMLElement>({ threshold: 0.2 });
+  const features = [
+    {
+      icon: Brain,
+      title: "AI Itinerary Generation",
+      desc: "Describe your trip and get a complete day-by-day plan in seconds — activities, meals, timing, and budget all included.",
+    },
+    {
+      icon: MessageSquare,
+      title: "Trip Concierge Chat",
+      desc: "Ask anything about your destination. Your AI concierge answers questions, finds restaurants, and gives local tips.",
+    },
+    {
+      icon: CalendarDays,
+      title: "Schedule & Map View",
+      desc: "Visualize your entire trip on an interactive map and calendar so you always know what's next.",
+    },
+    {
+      icon: MapPin,
+      title: "Proactive Notifications",
+      desc: "Get automated updates during your trip — check-in reminders, weather alerts, local events, and daily tips.",
+    },
   ]
-
-  // Use the custom hook with a specific element type (section)
-  const [ref, inView] = useInView<HTMLElement>({ threshold: 0.5 });
-
   return (
-    <section id="benefits" className="border-b" ref={ref}>
-      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-        <div className="mx-auto mb-10 max-w-2xl text-center">
-          <Badge variant="secondary" className="mb-3">Benefits</Badge>
-          <h2 className="text-pretty text-3xl font-semibold sm:text-4xl">
+    <section id="features" className="border-b" ref={ref}>
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <div className="mx-auto mb-12 max-w-2xl text-center">
+          <Badge variant="secondary" className="mb-3">Features</Badge>
+          <h2 className="text-3xl font-bold sm:text-4xl">
             {inView ? (
-              <Highlighter action="box" animationDuration={1500} color="#8E9C78">
-                Travel Anywhere with GlobeTrotter
+              <Highlighter action="highlight" color="#8E9C78" animationDuration={1500}>
+                Everything you need
               </Highlighter>
-            ) : (
-              "Travel Anywhere with GlobeTrotter"
-            )}
+            ) : "Everything you need"}{" "}
+            to travel better
           </h2>
-          <p className="text-muted-foreground mt-3">GlobeTrotter provides real travel insights, without the data overload.</p>
+          <p className="mt-3 text-muted-foreground">
+            GlobeTrotter handles the planning so you can focus on the experience.
+          </p>
         </div>
-
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {items.map((item) => (
-            <Card key={item.title} className="h-full">
-              <CardContent className="flex h-full flex-col gap-3 p-6">
+          {features.map((f) => (
+            <Card key={f.title} className="h-full">
+              <CardContent className="flex flex-col gap-3 p-6">
                 <div className="inline-flex size-10 items-center justify-center rounded-lg border bg-muted/60">
-                  <item.icon className="size-5" />
+                  <f.icon className="size-5" />
                 </div>
-                <h3 className="text-lg font-semibold">{item.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">{item.body}</p>
+                <h3 className="font-semibold">{f.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
               </CardContent>
             </Card>
           ))}
@@ -133,170 +142,77 @@ const BenefitsSection: FC = () => {
   )
 }
 
-const BigPictureSection: FC = () => {
-  const [ref, inView] = useInView<HTMLElement>({ threshold: 0.5 });
-  const bullets: string[] = [
-    "See your whole trip at a glance. No more juggling spreadsheets; get a clear, visual overview of your itinerary.",
-    "Keep everyone on the same page. Easily share your travel plans with your companions so everyone knows what's next.",
-    "Bring your adventure to life. Visualize your journey with interactive maps and timelines that make planning fun.",
-    "Effortlessly manage your budget. Track your spending and see where your money is going with a quick, clear snapshot of your trip.",
+const HowItWorksSection: FC = () => {
+  const steps = [
+    { step: "01", title: "Sign up for free", desc: "Create your account in seconds with your email." },
+    { step: "02", title: "Enter your destination", desc: "Tell us where you're going and for how long." },
+    { step: "03", title: "Get your AI itinerary", desc: "Receive a full day-by-day plan instantly." },
+    { step: "04", title: "Travel with confidence", desc: "Get real-time updates and concierge support throughout your trip." },
   ]
-
-
   return (
-    <section className="border-b" ref={ref}>
-      <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 sm:px-6 md:grid-cols-2">
-        <div className="relative order-last md:order-first">
-          <div className="aspect-video w-full overflow-hidden rounded-xl border shadow-sm">
-            <div className="grid h-full w-full place-items-center bg-gradient-to-tr from-muted to-transparent" />
-          </div>
+    <section id="how-it-works" className="border-b bg-muted/30">
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <div className="mx-auto mb-12 max-w-2xl text-center">
+          <Badge variant="secondary" className="mb-3">How It Works</Badge>
+          <h2 className="text-3xl font-bold sm:text-4xl">Up and running in minutes</h2>
+          <p className="mt-3 text-muted-foreground">No complicated setup. Just great trips.</p>
         </div>
-        <div className="flex flex-col gap-4">
-          <Badge variant="secondary" className="w-fit">See the Big Picture</Badge>
-          <h3 className="text-pretty text-2xl font-semibold sm:text-3xl">
-            {inView ? (
-              <Highlighter action="highlight" color="#8E9C78" animationDuration={1500}>
-              GlobeTrotter
-            </Highlighter>
-            ): ("GlobeTrotter")}
-             transforms your travel ideas into clear, vibrant visuals, giving you a beautiful overview of your next adventure.</h3>
-          <ul className="mt-2 space-y-3">
-            {bullets.map((b, i) => (
-              <li key={i} className="flex items-start gap-3">
-                <span className="mt-0.5 inline-flex size-6 items-center justify-center rounded-full border text-xs font-semibold">{String(i + 1).padStart(2, "0")}</span>
-                <span className="text-sm text-muted-foreground">{b}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// Define the props for the Column component
-interface ColumnProps {
-  title: string;
-  lines: string[];
-}
-
-const SpecsSection: FC = () => {
-  const GlobeTrotter: string[] = [
-    "Quick trip planning",
-    "Smart travel suggestions",
-    "Expense prediction",
-    "Effortless sharing",
-    "Summary generation and Chat Bot support",
-  ]
-  const websurge: string[] = [
-    "Slow trip planning",
-    "Limited recommendations",
-    "Manual booking required",
-    "Basic expense logging",
-    "Sharing can be tricky",
-    "Potential language errors",
-  ]
-  const hyperview: string[] = [
-    "Moderate speeds",
-    "No smart suggestions",
-    "Steep learning curve",
-    "No expense tracking",
-    "Limited sharing options",
-    "Partial language support",
-  ]
-
-  const Column: FC<ColumnProps> = ({ title, lines }) => (
-    <Card>
-      <CardContent className="p-6">
-        <div className="mb-5 flex items-center gap-3">
-          <div className="inline-flex size-9 items-center justify-center rounded-lg border bg-muted/60">
-            <Smartphone className="size-5" />
-          </div>
-          <h4 className="text-lg font-semibold">{title}</h4>
-        </div>
-        <ul className="space-y-3 text-sm">
-          {lines.map((l) => (
-            <li key={l} className="flex items-start gap-2">
-              <Check className="mt-0.5 size-4 text-primary" />
-              <span className="text-foreground/90">{l}</span>
-            </li>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {steps.map((s) => (
+            <div key={s.step} className="flex flex-col gap-3">
+              <span className="text-4xl font-bold text-primary/20">{s.step}</span>
+              <h3 className="font-semibold">{s.title}</h3>
+              <p className="text-sm text-muted-foreground">{s.desc}</p>
+            </div>
           ))}
-        </ul>
-      </CardContent>
-    </Card>
-  )
-
-  return (
-    <section id="specs" className="border-b">
-      <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
-        <div className="mx-auto mb-10 max-w-2xl text-center">
-          <Badge variant="secondary" className="mb-3">Specs</Badge>
-          <h2 className="text-pretty text-3xl font-semibold sm:text-4xl">Why Choose GlobeTrotter?</h2>
-          <p className="text-muted-foreground mt-3">You need a solution that keeps up. That’s why we developed GlobeTrotter. A traveller-friendly approach to get the most out of your trips.</p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-3">
-          <Column title="GlobeTrotter" lines={GlobeTrotter} />
-          <Column title="WebSurge" lines={websurge} />
-          <Column title="HyperView" lines={hyperview} />
         </div>
       </div>
     </section>
   )
 }
 
-const TestimonialSection: FC = () => {
+const CtaSection: FC = () => {
+  const { openSignIn } = useClerk()
   return (
     <section className="border-b">
-      <div className="mx-auto max-w-5xl px-4 py-14 sm:px-6">
-        <div className="relative overflow-hidden rounded-2xl border">
-          <div className="absolute inset-0 -z-10 grid place-items-center">
-            <div className="size-48 rounded-full bg-muted blur-3xl" />
-          </div>
-          <div className="grid gap-8 p-8 sm:p-12 md:grid-cols-[1.2fr_1fr] md:items-center">
-            <div className="space-y-5">
-              <p className="text-pretty text-xl font-medium sm:text-2xl">“I was skeptical, but GlobeTrotter has completely transformed the way I plan my vacations. The visual itineraries are so clear and intuitive, and the platform is so easy to use. I can&apos;t imagine planning a trip without it.”</p>
-              <div>
-                <p className="font-semibold">Prayash Pratim Baruah</p>
-                <p className="text-muted-foreground text-sm">Intern at IIT Guwahati</p>
-              </div>
-            </div>
-            <div className="grid place-items-center">
-              <div className="aspect-square w-60 rounded-full border bg-gradient-to-br from-muted to-transparent">
-                <Image
-                  src="/ChatGPT Image Aug 12, 2025, 05_30_32 AM.png" // path inside public folder
-                  alt="Prayash Pratim Baruah"
-                  width={240}
-                  height={240}
-                  className="object-cover rounded-full"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="mx-auto max-w-3xl px-4 py-20 sm:px-6 text-center">
+        <h2 className="text-3xl font-bold sm:text-4xl mb-4">Ready to plan your next trip?</h2>
+        <p className="text-muted-foreground mb-8 text-lg">
+          Join thousands of travelers using GlobeTrotter to plan smarter, stress-free trips.
+        </p>
+        <SignedOut>
+          <Button
+            size="lg"
+            className="rounded-full px-10"
+            onClick={() => openSignIn({ redirectUrl: `${window.location.origin}/auth-redirect` })}
+          >
+            Start Planning for Free <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </SignedOut>
+        <SignedIn>
+          <Link href="/concierge">
+            <Button size="lg" className="rounded-full px-10">
+              Open App <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </Link>
+        </SignedIn>
       </div>
     </section>
   )
 }
 
-
-const SiteFooter: FC = () => {
-  return (
-    <footer className="border-t">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6 md:flex-row md:items-center md:justify-between">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex size-7 items-center justify-center rounded-md border"><Sparkles className="size-4" /></span>
-          <span className="font-semibold">GlobeTrotter</span>
-        </div>
-        <nav className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
-          <a href="#benefits" className="hover:underline">Benefits</a>
-          <a href="#specs" className="hover:underline">Specifications</a>
-          <a href="#howto" className="hover:underline">How-to</a>
-          <a href="#contact" className="hover:underline">Contact Us</a>
-        </nav>
+const SiteFooter: FC = () => (
+  <footer className="border-t">
+    <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:px-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex size-7 items-center justify-center rounded-md border">
+          <Sparkles className="size-4" />
+        </span>
+        <span className="font-semibold">GlobeTrotter</span>
       </div>
-    </footer>
-  )
-}
+      <p className="text-xs text-muted-foreground">© 2026 GlobeTrotter. All rights reserved.</p>
+    </div>
+  </footer>
+)
 
 export default Home;

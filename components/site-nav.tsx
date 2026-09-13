@@ -33,10 +33,8 @@ function NavContent() {
     <>
       <SignedOut>
         <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
-          <Link className="hover:underline" href="#benefits">Benefits</Link>
-          <Link className="hover:underline" href="#specs">Specifications</Link>
-          <Link className="hover:underline" href="#howto">How-to</Link>
-          <Link className="hover:underline" href="#contact">Contact Us</Link>
+          <Link className="hover:text-primary transition-colors" href="#features">Features</Link>
+          <Link className="hover:text-primary transition-colors" href="#how-it-works">How It Works</Link>
         </nav>
       </SignedOut>
       <SignedIn>
@@ -44,7 +42,7 @@ function NavContent() {
           <Link className="hover:text-primary transition-colors" href="/concierge">Trip Concierge</Link>
           <Link className="hover:text-primary transition-colors" href="/llm">AI Travel Planner</Link>
           <Link className="hover:text-primary transition-colors" href="/mapcalendar">My Schedule</Link>
-          <Link className="hover:text-primary transition-colors" href="/community">View Community</Link>
+          <Link className="hover:text-primary transition-colors" href="/community">Community</Link>
         </nav>
       </SignedIn>
       <div className="flex items-center justify-end gap-3">
@@ -65,7 +63,7 @@ function NavContent() {
               </span>
             )}
           </Link>
-          <UserButton></UserButton>
+          <UserButton />
         </SignedIn>
       </div>
     </>

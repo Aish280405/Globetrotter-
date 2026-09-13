@@ -37,7 +37,7 @@ export async function GET(req: Request) {
     if (dbUser.role === "ADMIN") {
       return NextResponse.redirect(new URL("/admin-page", req.url));
     } else {
-      return NextResponse.redirect(new URL("/landing_page", req.url));
+      return NextResponse.redirect(new URL("/concierge", req.url));
     }
   } catch (err) {
     console.error("auth-redirect error:", err);

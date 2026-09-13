@@ -3,7 +3,8 @@
 import { config } from 'dotenv';
 import redis from '../lib/redis';
 
-// Load environment variables
+// Load the workspace-local environment file first, then fall back to .env
+config({ path: '.env.local' });
 config();
 
 // Debug: Show environment variables

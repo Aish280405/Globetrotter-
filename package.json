@@ -9,7 +9,9 @@
     "lint": "next lint",
     "workers": "tsx scripts/start-workers.ts",
     "test:redis": "tsx scripts/test-redis.ts",
-    "setup:redis": "tsx scripts/setup-redis.ts"
+    "setup:redis": "tsx scripts/setup-redis.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@clerk/clerk-sdk-node": "^4.13.23",

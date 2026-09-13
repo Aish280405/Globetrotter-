@@ -2,7 +2,8 @@
 
 import { config } from 'dotenv';
 
-// Load environment variables
+// Load the workspace-local environment file first, then fall back to .env
+config({ path: '.env.local' });
 config();
 
 console.log('🔧 Redis Setup Helper (Endpoint Method)');

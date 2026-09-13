@@ -18,6 +18,25 @@ enum UserRole {
   ADMIN
 }
 
+enum VenueType {
+  RESTAURANT
+  ACTIVITY
+  TRANSPORT
+}
+
+enum MessageType {
+  WEATHER
+  LOGISTICS
+  EVENT
+  TIP
+}
+
+enum NotificationStatus {
+  QUEUED
+  SENT
+  FAILED
+}
+
 model User {
   user_id           String   @id @default(cuid())
   password_hash     String?
@@ -27,8 +46,11 @@ model User {
   updated_at        DateTime @updatedAt
   profile_photo_url String?
 
-  trips   Trip[]
-  reviews Review[]
+  trips              Trip[]
+  reviews            Review[]
+  conciergeTrips     TripConcierge[]
+  userPreferences    UserPreference?
+  conversationHistory ConversationHistory[]
 
   @@map("users")
 }
@@ -163,4 +185,125 @@ model Review {
   @@map("reviews")
   @@index([trip_id])
   @@index([user_id])
+}
+
+// AI Trip Concierge Models
+
+model UserPreference {
+  id                String   @id @default(cuid())
+  user_id           String   @unique
+  user              User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  
+  cuisine_preferences String[] @default(["all"])
+  activity_types      String[] @default(["all"])
+  budget_range        String   @default("mid-range") // backpacker, budget, mid-range, luxury
+  travel_pace         String   @default("moderate") // relaxed, moderate, fast
+  interests           String[] @default([])
+  
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+
+  @@map("user_preferences")
+}
+
+model TripConcierge {
+  id                String   @id @default(cuid())
+  user_id           String
+  user              User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  
+  booking_id        String?  // External booking reference
+  property_id       String?  // External property reference
+  property_name     String?
+  property_location String?  // Goa area (Baga, Anjuna, South Goa, etc.)
+  
+  check_in          DateTime
+  check_out         DateTime
+  
+  itinerary         Json?    // Cached day-by-day plan
+  preferences       Json?    // Trip-specific preferences
+  
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
+  
+  notificationLogs  NotificationLog[]
+  conversationHistory ConversationHistory[]
+
+  @@map("trip_concierge")
+  @@index([user_id])
+  @@index([check_in, check_out])
+}
+
+model LocalVenue {
+  id              String   @id @default(cuid())
+  
+  name            String
+  type            VenueType
+  location        String   // Goa area
+  
+  rating          Float?   // 1-5
+  tags            String[] // cuisine, vibe, price range, etc.
+  
+  // Contact info
+  phone           String?
+  website         String?
+  image_url       String?
+  
+  // Location data
+  latitude        Float?
+  longitude       Float?
+  address         String?
+  
+  // Metadata
+  metadata        Json?    // hours, price_range, cuisine, etc.
+  
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+  
+  @@map("local_venues")
+  @@index([type])
+  @@index([location])
+  @@index([tags])
+}
+
+model NotificationLog {
+  id              String   @id @default(cuid())
+  trip_id         String
+  trip            TripConcierge @relation(fields: [trip_id], references: [id], onDelete: Cascade)
+  
+  message_type    MessageType
+  message_content String
+  status          NotificationStatus @default(QUEUED)
+  
+  phone_number    String?
+  scheduled_at    DateTime?
+  sent_at         DateTime?
+  
+  metadata        Json?    // response, error details, etc.
+  
+  created_at      DateTime @default(now())
+  updated_at      DateTime @updatedAt
+
+  @@map("notification_logs")
+  @@index([trip_id])
+  @@index([status])
+  @@index([scheduled_at])
+}
+
+model ConversationHistory {
+  id              String   @id @default(cuid())
+  user_id         String
+  user            User     @relation(fields: [user_id], references: [user_id], onDelete: Cascade)
+  
+  trip_id         String?
+  trip            TripConcierge? @relation(fields: [trip_id], references: [id], onDelete: SetNull)
+  
+  role            String   // "user" or "assistant"
+  message         String
+  metadata        Json?    // intent, tools_used, etc.
+  
+  created_at      DateTime @default(now())
+
+  @@map("conversation_history")
+  @@index([user_id])
+  @@index([trip_id])
 }

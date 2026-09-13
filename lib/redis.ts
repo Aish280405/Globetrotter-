@@ -1,19 +1,24 @@
 import Redis from 'ioredis';
 import { config } from 'dotenv';
 
-// Load environment variables first
+// Load the workspace-local environment file first, then fall back to .env
+config({ path: '.env.local' });
 config();
 
-// Redis Cloud connection using endpoint and password
+// Redis connection with fallback to localhost
 const redis = new Redis({
-  host: process.env.REDIS_HOST || 'redis-13510.c8.us-east-1-3.ec2.redns.redis-cloud.com',
-  port: parseInt(process.env.REDIS_PORT || '13510'),
-  password: process.env.REDIS_PASSWORD,
+  host: process.env.REDIS_HOST || 'localhost',
+  port: parseInt(process.env.REDIS_PORT || '6379'),
+  password: process.env.REDIS_PASSWORD || undefined,
   username: process.env.REDIS_USERNAME || 'default',
   maxRetriesPerRequest: null,
   lazyConnect: false,
   enableOfflineQueue: true,
-  connectTimeout: 10000,
+  connectTimeout: 5000,
+  retryStrategy: (times) => {
+    const delay = Math.min(times * 50, 2000);
+    return delay;
+  },
 });
 
 // Handle connection events
@@ -22,10 +27,11 @@ redis.on('connect', () => {
 });
 
 redis.on('error', (err) => {
-  console.error('❌ Redis connection error:', err.message);
+  console.error('⚠️  Redis connection error:', err.message);
   if (err.message.includes('NOAUTH')) {
-    console.error('💡 Authentication failed. Please check your Redis password.');
-    console.error('   Make sure REDIS_PASSWORD is set in your .env file');
+    console.error('💡 Authentication failed. Check REDIS_PASSWORD in .env.local');
+  } else if (err.message.includes('ECONNREFUSED')) {
+    console.error('💡 Redis not running. Start Redis with: redis-server');
   }
 });
 

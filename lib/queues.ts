@@ -8,12 +8,20 @@ const queueRedis = new Redis({
   maxRetriesPerRequest: null, // Required by BullMQ
 });
 
-// This module is a queue producer only. A BullMQ Worker must run in a dedicated,
-// persistent process (not in a Vercel serverless function or build worker).
-export const travelPlanQueue = new Queue('travel-plan-queue', {
-  connection: queueRedis,
-  defaultJobOptions: {
-    removeOnComplete: 100,
-    removeOnFail: 50,
-  },
-});
+let travelPlanQueue: Queue | undefined;
+
+// Do not construct BullMQ objects at module import time. Next.js imports API
+// routes during Vercel builds, where no Redis connection should be opened.
+export function getTravelPlanQueue(): Queue {
+  if (!travelPlanQueue) {
+    travelPlanQueue = new Queue('travel-plan-queue', {
+      connection: queueRedis,
+      defaultJobOptions: {
+        removeOnComplete: 100,
+        removeOnFail: 50,
+      },
+    });
+  }
+
+  return travelPlanQueue;
+}

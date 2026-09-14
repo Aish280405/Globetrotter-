@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { travelPlanQueue } from '@/lib/queues';
+import { getTravelPlanQueue } from '@/lib/queues';
 import redis from '@/lib/redis';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     await redis.set(processingKey, requestKey, 'EX', 300); // 5 minute expiry
     
     // Enqueue the job
-    const job = await travelPlanQueue.add('generate-travel-plan', {
+    const job = await getTravelPlanQueue().add('generate-travel-plan', {
       ...travelData,
       requestKey,
       inputHash

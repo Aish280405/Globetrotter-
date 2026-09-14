@@ -63,10 +63,16 @@ function SaveToScheduleButton({
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   const handleSave = async () => {
     if (!tripId) {
       setError("No trip ID available");
+      return;
+    }
+
+    if (!/^\+[1-9]\d{7,14}$/.test(phoneNumber.replace(/[^+\d]/g, ""))) {
+      setError("Enter your WhatsApp number with country code, e.g. +919876543210");
       return;
     }
 
@@ -83,6 +89,7 @@ function SaveToScheduleButton({
           checkIn,
           checkOut,
           itinerary,
+          phoneNumber,
         }),
       });
 
@@ -110,7 +117,15 @@ function SaveToScheduleButton({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <Input
+        aria-label="WhatsApp number"
+        type="tel"
+        value={phoneNumber}
+        onChange={(event) => setPhoneNumber(event.target.value)}
+        placeholder="WhatsApp number, e.g. +919876543210"
+        className="w-72"
+      />
       <Button
         onClick={handleSave}
         disabled={loading || !tripId}

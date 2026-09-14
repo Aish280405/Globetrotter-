@@ -11,11 +11,21 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { tripId, propertyLocation, checkIn, checkOut, itinerary } = body;
+    const { tripId, propertyLocation, checkIn, checkOut, itinerary, phoneNumber } = body;
 
     if (!tripId || !propertyLocation || !checkIn || !checkOut || !itinerary) {
       return NextResponse.json(
         { error: "Missing required fields" },
+        { status: 400 }
+      );
+    }
+
+    const normalizedPhone = typeof phoneNumber === "string"
+      ? phoneNumber.trim().replace(/[^+\d]/g, "")
+      : "";
+    if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) {
+      return NextResponse.json(
+        { error: "Enter a valid WhatsApp number with country code, for example +919876543210" },
         { status: 400 }
       );
     }
@@ -35,6 +45,11 @@ export async function POST(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
+
+    await prisma.user.update({
+      where: { user_id: user.user_id },
+      data: { phone_number: normalizedPhone },
+    });
 
     // Update or create trip_concierge record
     const trip = await prisma.tripConcierge.upsert({

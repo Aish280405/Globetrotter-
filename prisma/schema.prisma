@@ -41,6 +41,7 @@ model User {
   user_id           String   @id @default(cuid())
   password_hash     String?
   email             String   @unique
+  phone_number      String?  @unique
   role              UserRole @default(USER)
   created_at        DateTime @default(now())
   updated_at        DateTime @updatedAt

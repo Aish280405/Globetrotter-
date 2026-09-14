@@ -47,7 +47,7 @@ async function sendWhatsAppMessage(
         process.env.TWILIO_AUTH_TOKEN
       );
 
-      const fromNumber = process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155552671"; // Twilio sandbox
+      const fromNumber = process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155238886"; // Twilio sandbox
       const toNumber = phoneNumber.startsWith("whatsapp:")
         ? phoneNumber
         : `whatsapp:${phoneNumber}`;
@@ -89,10 +89,13 @@ async function sendWhatsAppMessage(
 
 async function getUserFromPhoneNumber(phoneNumber: string): Promise<User | null> {
   try {
-    // Users do not currently have a phone-number field. Do not guess from an
-    // email address or select an arbitrary trip user: that would leak history.
-    console.warn(`Cannot associate WhatsApp sender ${phoneNumber}: no phone field on User`);
-    return null;
+    const normalizedPhone = phoneNumber
+      .replace(/^whatsapp:/, "")
+      .replace(/[^+\d]/g, "");
+
+    return prisma.user.findUnique({
+      where: { phone_number: normalizedPhone },
+    });
   } catch (error) {
     console.error("Error finding user:", error);
     return null;

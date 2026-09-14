@@ -26,9 +26,8 @@ async function sendWhatsAppMessage(
       return true;
     }
 
-    // Dev mode: just log
-    console.log(`📱 [DEV] WhatsApp to ${phoneNumber}: ${message.substring(0, 80)}...`);
-    return true;
+    console.warn("Twilio credentials are not configured; WhatsApp message was not sent");
+    return false;
   } catch (error) {
     console.error("Error sending WhatsApp:", error);
     return false;
@@ -107,9 +106,7 @@ export async function generateNotificationsForTrip(tripId: string) {
     );
 
     const location = trip.property_location || "Goa";
-    // User has no phone-number field yet. Never submit an email address to the
-    // WhatsApp API; this must be populated from a real, verified phone number.
-    const phone = undefined;
+    const phone = trip.user.phone_number || undefined;
 
     // --- PRE-TRIP notifications ---
     if (daysUntilCheckIn === 3) {
@@ -183,15 +180,14 @@ export async function generateNotificationsForTrip(tripId: string) {
 
 export async function sendNotification(payload: NotificationPayload): Promise<boolean> {
   try {
-    // Always save to DB first — this is what shows up in the notifications page
-    await prisma.notificationLog.create({
+    // Create the notification first, then record Twilio's actual outcome.
+    const notification = await prisma.notificationLog.create({
       data: {
         trip_id: payload.tripId,
         message_type: payload.messageType.toUpperCase() as any,
         message_content: payload.content,
         phone_number: payload.phoneNumber,
-        status: "SENT",
-        sent_at: new Date(),
+        status: "QUEUED",
         metadata: {
           delivery_method: "app",
           timestamp: new Date().toISOString(),
@@ -199,13 +195,16 @@ export async function sendNotification(payload: NotificationPayload): Promise<bo
       },
     });
 
-    // Then try WhatsApp (non-blocking — don't fail if it doesn't send)
-    await sendWhatsAppMessage(payload.phoneNumber || "", payload.content).catch((e) =>
-      console.warn("WhatsApp send failed (notification still saved to DB):", e)
-    );
+    const delivered = await sendWhatsAppMessage(payload.phoneNumber || "", payload.content);
+    await prisma.notificationLog.update({
+      where: { id: notification.id },
+      data: delivered
+        ? { status: "SENT", sent_at: new Date() }
+        : { status: "FAILED", metadata: { delivery_method: "whatsapp", error: "Twilio did not accept the message" } as any },
+    });
 
-    console.log(`✓ Notification saved: [${payload.messageType}] for trip ${payload.tripId}`);
-    return true;
+    console.log(`✓ Notification processed: [${payload.messageType}] for trip ${payload.tripId}`);
+    return delivered;
   } catch (error) {
     console.error("Error saving notification:", error);
 

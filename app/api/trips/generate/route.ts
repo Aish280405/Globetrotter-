@@ -84,7 +84,14 @@ async function generateItinerary(
 ): Promise<GeneratedItinerary> {
   // Check cache first
   const cacheKey = `itinerary:${request.property_location}:${request.check_in}:${request.check_out}`;
-  const cached = await redis.get(cacheKey);
+  let cached: string | null = null;
+  try {
+    cached = await redis.get(cacheKey);
+  } catch (error) {
+    // Caching is an optimization. Do not fail itinerary generation when Redis
+    // is unavailable in a serverless runtime.
+    console.warn("Redis cache read failed; generating itinerary without cache:", error);
+  }
 
   if (cached) {
     console.log("✓ Returning cached itinerary");
@@ -169,8 +176,12 @@ IMPORTANT:
 
   const itinerary = JSON.parse(jsonMatch[0]) as GeneratedItinerary;
 
-  // Cache for 24 hours
-  await redis.setex(cacheKey, 86400, JSON.stringify(itinerary));
+  // Cache for 24 hours, without making Redis availability user-facing.
+  try {
+    await redis.setex(cacheKey, 86400, JSON.stringify(itinerary));
+  } catch (error) {
+    console.warn("Redis cache write failed; returning uncached itinerary:", error);
+  }
 
   return itinerary;
 }

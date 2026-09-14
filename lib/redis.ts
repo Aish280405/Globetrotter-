@@ -1,25 +1,34 @@
 import Redis from 'ioredis';
+import type { RedisOptions } from 'ioredis';
 import { config } from 'dotenv';
 
 // Load the workspace-local environment file first, then fall back to .env
 config({ path: '.env.local' });
 config();
 
-// Redis connection with fallback to localhost
-const redis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
+const configuredHost = process.env.REDIS_HOST || 'localhost';
+const hostUrl = configuredHost.includes('://') ? new URL(configuredHost) : null;
+
+// Supports normal Redis hostnames and Upstash-style https/rediss endpoints.
+export const redisConnectionOptions: RedisOptions = {
+  host: hostUrl?.hostname || configuredHost,
+  port: parseInt(process.env.REDIS_PORT || hostUrl?.port || '6379'),
   password: process.env.REDIS_PASSWORD || undefined,
   username: process.env.REDIS_USERNAME || 'default',
+  tls: hostUrl?.protocol === 'https:' || hostUrl?.protocol === 'rediss:' ? {} : undefined,
   maxRetriesPerRequest: null,
-  lazyConnect: false,
+  // Next.js imports route modules while generating static pages on Vercel.
+  // Do not open a TCP socket at import time; the first Redis command connects.
+  lazyConnect: true,
   enableOfflineQueue: true,
   connectTimeout: 5000,
   retryStrategy: (times) => {
     const delay = Math.min(times * 50, 2000);
     return delay;
   },
-});
+};
+
+const redis = new Redis(redisConnectionOptions);
 
 // Handle connection events
 redis.on('connect', () => {

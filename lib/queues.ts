@@ -1,26 +1,12 @@
 import { Queue, Worker } from 'bullmq';
 import Redis from 'ioredis';
-import { config } from 'dotenv';
-
-// Load the workspace-local environment file first, then fall back to .env
-config({ path: '.env.local' });
-config();
+import redis, { redisConnectionOptions } from './redis';
 
 // Create a separate Redis connection for BullMQ (with required settings)
 const queueRedis = new Redis({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379'),
-  password: process.env.REDIS_PASSWORD || undefined,
-  username: process.env.REDIS_USERNAME || 'default',
+  ...redisConnectionOptions,
   maxRetriesPerRequest: null, // Required by BullMQ
-  lazyConnect: false,
-  enableOfflineQueue: true,
-  connectTimeout: 5000,
-  retryStrategy: (times) => Math.min(times * 50, 2000),
 });
-
-// Import the main Redis connection for caching
-import redis from './redis';
 
 interface TravelDetails {
   destinations: string[];

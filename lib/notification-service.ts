@@ -1,5 +1,4 @@
 import prisma from "./prisma";
-import { addDays, isTomorrow, isToday } from "date-fns";
 
 export type NotificationType = "weather" | "logistics" | "event" | "tip";
 
@@ -9,46 +8,29 @@ async function sendWhatsAppMessage(
   message: string
 ): Promise<boolean> {
   try {
-    // Skip sending if no phone number
-    if (!phoneNumber) {
-      console.log("No phone number provided, skipping WhatsApp message");
-      return false;
-    }
+    if (!phoneNumber) return false;
 
-    // Option 1: Using Twilio SDK
     if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
       const twilio = require("twilio");
       const client = twilio(
         process.env.TWILIO_ACCOUNT_SID,
         process.env.TWILIO_AUTH_TOKEN
       );
-
       const fromNumber = process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155238886";
-      
-      // Convert phone number to WhatsApp format if needed
-      const toNumber = phoneNumber.startsWith("whatsapp:") 
-        ? phoneNumber 
+      const toNumber = phoneNumber.startsWith("whatsapp:")
+        ? phoneNumber
         : `whatsapp:${phoneNumber}`;
 
-      await client.messages.create({
-        body: message,
-        from: fromNumber,
-        to: toNumber,
-      });
-
-      console.log(
-        `✅ WhatsApp notification sent to ${phoneNumber}: ${message.substring(0, 50)}...`
-      );
+      await client.messages.create({ body: message, from: fromNumber, to: toNumber });
+      console.log(`✅ WhatsApp sent to ${phoneNumber}`);
       return true;
     }
 
-    // Fallback: just log (for development without Twilio)
-    console.log(
-      `📱 [DEV] WhatsApp notification to ${phoneNumber}: ${message.substring(0, 50)}...`
-    );
+    // Dev mode: just log
+    console.log(`📱 [DEV] WhatsApp to ${phoneNumber}: ${message.substring(0, 80)}...`);
     return true;
   } catch (error) {
-    console.error("Error sending WhatsApp notification:", error);
+    console.error("Error sending WhatsApp:", error);
     return false;
   }
 }
@@ -60,29 +42,47 @@ interface NotificationPayload {
   content: string;
 }
 
-// Predefined notification templates
-const notificationTemplates = {
-  weather_rain:
-    "☔ Rain expected tomorrow in Goa. We've updated your indoor plan recommendations. Check your itinerary!",
-  weather_sunny:
-    "☀️ Perfect sunny weather expected! Great day for beach activities. Don't forget sunscreen!",
-  checkin_tomorrow:
-    "🏨 Your check-in is tomorrow! Here's parking info: Paid parking available near most Goa beaches. We recommend arriving after 2 PM.",
-  checkin_today:
-    "🎉 Welcome to Goa! Your concierge is ready to help. Text 'help' for recommendations or ask specific questions.",
-  event_happening:
-    "🎉 Tonight: Full moon beach party at Anjuna Beach! Gates open 9 PM. Music, food, dancing. Want a ride recommendation?",
-  event_weekend:
-    "🎪 This weekend: Goa Carnival celebrations with parades and local food. Perfect for cultural experience!",
-  tip_restaurant:
-    "🍽️ Pro tip: Peak restaurant hours are 7-9 PM. Make reservations in advance for popular spots like Thalassa or The Fishery.",
-  tip_transport:
-    "🚕 Pro tip: Use Uber/Ola for safe, reliable transport. Local taxis are available but negotiate prices upfront.",
-  tip_safety:
-    "🛡️ Safety reminder: Keep valuables secure, use registered taxis at night, stay in well-lit areas.",
-};
+// --- Notification generators per scenario ---
 
-// Determine which notifications to send based on trip dates and context
+function preTrip3Days(location: string): string {
+  return `✈️ 3 days to go! Your trip to ${location} is coming up. Here's a quick checklist: ID/passport, travel insurance, local SIM or data plan, and some cash in INR. Excited for you!`;
+}
+
+function preTrip1Day(location: string): string {
+  return `🏨 Tomorrow's the day! Check-in for ${location} is tomorrow. Tip: arrive after 2 PM to avoid the rush. Pack light, the beaches are worth it!`;
+}
+
+function checkInToday(location: string): string {
+  return `🎉 Welcome to ${location}! Your concierge is here. Ask me anything — restaurants, activities, transport, or local tips. Just say "help" to get started.`;
+}
+
+function duringTripTip(dayOfWeek: number): string {
+  const tips = [
+    "🍽️ Peak dinner hours are 7–9 PM. Reserve ahead at popular spots like Thalassa or The Fishery.",
+    "🚕 Use Uber/Ola for safe rides. Local taxis are fine but agree on price upfront.",
+    "🌊 Best time for beaches: early morning (7–9 AM) before the crowds and heat hit.",
+    "🛡️ Keep valuables in your hotel safe. Only carry what you need for the day.",
+    "🌅 Don't miss a sunset at Vagator or Palolem — usually around 6:15 PM.",
+    "🍺 Kingfisher beer on a beach shack is a Goa rite of passage. Cheers! 🥂",
+    "📸 Golden hour is 6–6:30 PM — great for photos at any beach.",
+  ];
+  return tips[dayOfWeek % tips.length];
+}
+
+function weekendEvent(): string {
+  return "🎪 This weekend: Anjuna Flea Market (Wednesday), beach parties at Baga, and a sunset cruise from Panjim jetty. Want details on any of these?";
+}
+
+function weatherSunny(): string {
+  return "☀️ Clear skies ahead! Perfect day for water sports or a beach walk. Sunscreen SPF 50+ recommended — the Goa sun is strong.";
+}
+
+function weatherRain(): string {
+  return "☔ Rain expected today. Good day for Old Goa sightseeing, spice plantation tours, or cozy cafe time in Panjim's Fontainhas quarter.";
+}
+
+// --- Main generator ---
+
 export async function generateNotificationsForTrip(tripId: string) {
   try {
     const trip = await prisma.tripConcierge.findUnique({
@@ -90,74 +90,85 @@ export async function generateNotificationsForTrip(tripId: string) {
       include: { user: true },
     });
 
-    if (!trip) {
-      console.log("Trip not found:", tripId);
-      return [];
-    }
+    if (!trip) return [];
 
     const notifications: NotificationPayload[] = [];
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const checkInDate = new Date(trip.check_in);
-    checkInDate.setHours(0, 0, 0, 0);
+    const checkIn = new Date(trip.check_in);
+    checkIn.setHours(0, 0, 0, 0);
 
-    const checkOutDate = new Date(trip.check_out);
-    checkOutDate.setHours(0, 0, 0, 0);
+    const checkOut = new Date(trip.check_out);
+    checkOut.setHours(0, 0, 0, 0);
 
-    // Check-in tomorrow notification
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    const daysUntilCheckIn = Math.round(
+      (checkIn.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+    );
 
-    if (checkInDate.getTime() === tomorrow.getTime()) {
+    const location = trip.property_location || "Goa";
+    const phone = trip.user.email; // using email as placeholder; swap for phone field when available
+
+    // --- PRE-TRIP notifications ---
+    if (daysUntilCheckIn === 3) {
       notifications.push({
         tripId,
-        phoneNumber: trip.user.email,
+        phoneNumber: phone,
         messageType: "logistics",
-        content:
-          notificationTemplates.checkin_tomorrow,
+        content: preTrip3Days(location),
       });
     }
 
-    // Check-in today notification
-    if (checkInDate.getTime() === today.getTime()) {
+    if (daysUntilCheckIn === 1) {
       notifications.push({
         tripId,
-        phoneNumber: trip.user.email,
+        phoneNumber: phone,
         messageType: "logistics",
-        content: notificationTemplates.checkin_today,
+        content: preTrip1Day(location),
       });
     }
 
-    // Add event notifications (if guest is during their trip)
-    if (
-      today >= checkInDate &&
-      today <= checkOutDate
-    ) {
-      // Weekend event
+    // --- CHECK-IN DAY ---
+    if (daysUntilCheckIn === 0) {
+      notifications.push({
+        tripId,
+        phoneNumber: phone,
+        messageType: "logistics",
+        content: checkInToday(location),
+      });
+    }
+
+    // --- DURING TRIP notifications ---
+    const isDuringTrip = today >= checkIn && today <= checkOut;
+
+    if (isDuringTrip) {
       const dayOfWeek = today.getDay();
+
+      // Daily tip
+      notifications.push({
+        tripId,
+        phoneNumber: phone,
+        messageType: "tip",
+        content: duringTripTip(dayOfWeek),
+      });
+
+      // Weekend event nudge (Friday only)
       if (dayOfWeek === 5) {
-        // Friday
         notifications.push({
           tripId,
-          phoneNumber: trip.user.email,
+          phoneNumber: phone,
           messageType: "event",
-          content: notificationTemplates.event_weekend,
+          content: weekendEvent(),
         });
       }
 
-      // Daily tips rotation
-      const tipOptions = [
-        notificationTemplates.tip_restaurant,
-        notificationTemplates.tip_transport,
-        notificationTemplates.tip_safety,
-      ];
-      const tip = tipOptions[dayOfWeek % tipOptions.length];
+      // Simple weather rotation based on day (in prod: replace with real weather API)
+      const weatherContent = dayOfWeek % 2 === 0 ? weatherSunny() : weatherRain();
       notifications.push({
         tripId,
-        phoneNumber: trip.user.email,
-        messageType: "tip",
-        content: tip,
+        phoneNumber: phone,
+        messageType: "weather",
+        content: weatherContent,
       });
     }
 
@@ -168,11 +179,9 @@ export async function generateNotificationsForTrip(tripId: string) {
   }
 }
 
-export async function sendNotification(
-  payload: NotificationPayload
-): Promise<boolean> {
+export async function sendNotification(payload: NotificationPayload): Promise<boolean> {
   try {
-    // Log notification to database
+    // Always save to DB first — this is what shows up in the notifications page
     await prisma.notificationLog.create({
       data: {
         trip_id: payload.tripId,
@@ -182,31 +191,23 @@ export async function sendNotification(
         status: "SENT",
         sent_at: new Date(),
         metadata: {
-          delivery_method: "whatsapp", // In production: WhatsApp API
+          delivery_method: "app",
           timestamp: new Date().toISOString(),
         } as any,
       },
     });
 
-    // Send actual WhatsApp message via Twilio
-    const success = await sendWhatsAppMessage(payload.phoneNumber || '', payload.content);
-    
-    if (success) {
-      console.log(
-        `✓ Notification sent to ${payload.phoneNumber}: ${payload.messageType}`
-      );
-    } else {
-      console.error(
-        `✗ Failed to send notification to ${payload.phoneNumber}: ${payload.messageType}`
-      );
-      throw new Error('Failed to send WhatsApp message');
-    }
+    // Then try WhatsApp (non-blocking — don't fail if it doesn't send)
+    await sendWhatsAppMessage(payload.phoneNumber || "", payload.content).catch((e) =>
+      console.warn("WhatsApp send failed (notification still saved to DB):", e)
+    );
 
+    console.log(`✓ Notification saved: [${payload.messageType}] for trip ${payload.tripId}`);
     return true;
   } catch (error) {
-    console.error("Error sending notification:", error);
+    console.error("Error saving notification:", error);
 
-    // Log failed notification
+    // Try to log the failure
     try {
       await prisma.notificationLog.create({
         data: {
@@ -220,59 +221,54 @@ export async function sendNotification(
           } as any,
         },
       });
-    } catch (logError) {
-      console.error("Error logging failed notification:", logError);
-    }
+    } catch (_) {}
 
     return false;
   }
 }
 
-// Main cron job: Run this every day at 8 AM, 2 PM, 8 PM
+// Main cron job: called 3x daily (8 AM, 2 PM, 8 PM)
 export async function runNotificationCronJob() {
   try {
-    console.log(
-      "🔔 Running notification cron job at",
-      new Date().toISOString()
-    );
+    console.log("🔔 Running notification cron job at", new Date().toISOString());
 
-    // Get all active trips (check-in <= today <= check-out)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const activeTips = await prisma.tripConcierge.findMany({
+    // Look at trips happening in the next 3 days AND currently active trips
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+
+    const relevantTrips = await prisma.tripConcierge.findMany({
       where: {
         check_in: {
-          lte: today,
+          lte: threeDaysFromNow, // trips starting within 3 days
         },
         check_out: {
-          gte: today,
+          gte: today, // trips not yet finished
         },
       },
     });
 
-    console.log(`Found ${activeTips.length} active trips`);
+    console.log(`Found ${relevantTrips.length} relevant trips`);
 
     let successCount = 0;
     let failureCount = 0;
 
-    for (const trip of activeTips) {
+    for (const trip of relevantTrips) {
       const notifications = await generateNotificationsForTrip(trip.id);
+      console.log(`  Trip ${trip.id} (${trip.property_location}): ${notifications.length} notifications`);
 
       for (const notif of notifications) {
         const sent = await sendNotification(notif);
-        if (sent) {
-          successCount++;
-        } else {
-          failureCount++;
-        }
+        sent ? successCount++ : failureCount++;
       }
     }
 
-    console.log(
-      `✅ Notification job complete: ${successCount} sent, ${failureCount} failed`
-    );
+    console.log(`✅ Cron complete: ${successCount} sent, ${failureCount} failed`);
+    return { successCount, failureCount, tripsProcessed: relevantTrips.length };
   } catch (error) {
     console.error("Cron job error:", error);
+    throw error;
   }
 }

@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
   try {
+    const apiKey = req.headers.get("x-test-whatsapp-key");
+    if (!process.env.TEST_WHATSAPP_API_KEY || apiKey !== process.env.TEST_WHATSAPP_API_KEY) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { phoneNumber, message } = await req.json();
 
     if (!phoneNumber || !message) {
@@ -59,7 +64,7 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   return NextResponse.json({
     message: "WhatsApp Test Endpoint",
-    usage: "POST with { phoneNumber: '+1234567890', message: 'test' }",
+    usage: "POST with x-test-whatsapp-key and { phoneNumber: '+1234567890', message: 'test' }",
     twilioConfigured: !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN),
   });
 }

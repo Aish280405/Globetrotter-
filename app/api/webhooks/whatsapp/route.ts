@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { User } from "@prisma/client";
 import { chat } from "@/lib/chat-agent";
 import prisma from "@/lib/prisma";
 
@@ -47,11 +48,14 @@ async function sendWhatsAppMessage(
       );
 
       const fromNumber = process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155552671"; // Twilio sandbox
+      const toNumber = phoneNumber.startsWith("whatsapp:")
+        ? phoneNumber
+        : `whatsapp:${phoneNumber}`;
 
       await client.messages.create({
         body: message,
         from: fromNumber,
-        to: `whatsapp:${phoneNumber}`,
+        to: toNumber,
       });
 
       console.log(
@@ -75,48 +79,20 @@ async function sendWhatsAppMessage(
     //   })
     // });
 
-    // Fallback: just log (for development without Twilio)
-    console.log(
-      `📱 [DEV] WhatsApp message to ${phoneNumber}: ${message.substring(0, 50)}...`
-    );
-    return true;
+    console.warn("Twilio credentials are not configured; WhatsApp message was not sent");
+    return false;
   } catch (error) {
     console.error("Error sending WhatsApp message:", error);
     return false;
   }
 }
 
-async function getUserFromPhoneNumber(phoneNumber: string) {
+async function getUserFromPhoneNumber(phoneNumber: string): Promise<User | null> {
   try {
-    // Try to find user by their active trip check-in
-    // WhatsApp typically sends numbers with country code (e.g., +919876543210)
-    const cleanPhone = phoneNumber.replace(/\D/g, ""); // Remove non-digits
-
-    // First, try finding by any trip association
-    const tripConcierge = await prisma.tripConcierge.findFirst({
-      where: {
-        // Join with user to search
-      },
-      include: {
-        user: true,
-      },
-    });
-
-    if (tripConcierge?.user) {
-      return tripConcierge.user;
-    }
-
-    // Fallback: find by email pattern match
-    const user = await prisma.user.findFirst({
-      where: {
-        email: {
-          contains: cleanPhone,
-          mode: "insensitive",
-        },
-      },
-    });
-
-    return user || null;
+    // Users do not currently have a phone-number field. Do not guess from an
+    // email address or select an arbitrary trip user: that would leak history.
+    console.warn(`Cannot associate WhatsApp sender ${phoneNumber}: no phone field on User`);
+    return null;
   } catch (error) {
     console.error("Error finding user:", error);
     return null;
@@ -167,18 +143,60 @@ export async function GET(req: NextRequest) {
 // Handle incoming WhatsApp messages
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as WhatsAppWebhookPayload;
+    const contentType = req.headers.get("content-type") || "";
 
-    console.log("📨 WhatsApp webhook received:", JSON.stringify(body, null, 2));
+    let fromPhone = "";
+    let messageBody = "";
 
-    // Process messages
-    if (body.entry && body.entry[0] && body.entry[0].changes) {
-      for (const change of body.entry[0].changes) {
-        if (change.value.messages) {
-          for (const message of change.value.messages) {
-            await handleIncomingMessage(message);
+    if (contentType.includes("application/json")) {
+      // Meta/WhatsApp Business API format
+      const body = (await req.json()) as WhatsAppWebhookPayload;
+      console.log("📨 WhatsApp webhook received (JSON):", JSON.stringify(body, null, 2));
+
+      if (body.entry && body.entry[0] && body.entry[0].changes) {
+        for (const change of body.entry[0].changes) {
+          if (change.value.messages) {
+            for (const message of change.value.messages) {
+              await handleIncomingMessage(message);
+            }
           }
         }
+      }
+    } else if (contentType.includes("application/x-www-form-urlencoded")) {
+      // Twilio format (form data)
+      const text = await req.text();
+      const params = new URLSearchParams(text);
+
+      const signature = req.headers.get("x-twilio-signature");
+      const webhookUrl = process.env.TWILIO_WEBHOOK_URL;
+      if (!signature || !webhookUrl || !process.env.TWILIO_AUTH_TOKEN) {
+        console.warn("Rejected Twilio webhook: signature verification is not configured");
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const twilio = require("twilio");
+      const isValid = twilio.validateRequest(
+        process.env.TWILIO_AUTH_TOKEN,
+        signature,
+        webhookUrl,
+        Object.fromEntries(params.entries())
+      );
+      if (!isValid) {
+        console.warn("Rejected Twilio webhook with an invalid signature");
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      fromPhone = params.get("From") || "";
+      messageBody = params.get("Body") || "";
+
+      console.log(`📨 Twilio webhook received from ${fromPhone}: ${messageBody}`);
+
+      if (fromPhone && messageBody) {
+        await handleIncomingMessage({
+          from: fromPhone,
+          body: messageBody,
+          timestamp: new Date().toISOString(),
+        });
       }
     }
 
@@ -196,14 +214,13 @@ async function handleIncomingMessage(message: WhatsAppWebhookMessage) {
 
     console.log(`💬 Message from ${phoneNumber}: ${userMessage}`);
 
-    // Find or create user associated with this phone number
+    // Find user associated with this phone number
     let user = await getUserFromPhoneNumber(phoneNumber);
 
     if (!user) {
       console.log(
         `⚠️ User not found for phone number ${phoneNumber}. Using demo/guest mode.`
       );
-      // In production, you might create a temporary user or use a demo account
     }
 
     // Get active trip (if exists)
@@ -217,11 +234,8 @@ async function handleIncomingMessage(message: WhatsAppWebhookMessage) {
         })
       : null;
 
-    // For now, use simple conversation without persisting history
-    // (conversationHistory table may not exist in schema)
-    const conversationHistory: { role: "user" | "assistant"; content: string }[] = [];
-
     // Get AI response using chat agent
+    const conversationHistory: { role: "user" | "assistant"; content: string }[] = [];
     console.log(`🤖 Getting response from chat agent for: "${userMessage}"`);
     const response = await chat(userMessage, conversationHistory);
 
@@ -236,7 +250,7 @@ async function handleIncomingMessage(message: WhatsAppWebhookMessage) {
       console.error("Failed to send WhatsApp message");
     }
 
-    // Log conversation if we have a user and table exists
+    // Log conversation if we have a user
     if (user) {
       try {
         await prisma.conversationHistory.create({
@@ -262,7 +276,6 @@ async function handleIncomingMessage(message: WhatsAppWebhookMessage) {
         });
       } catch (logError) {
         console.warn("Could not log conversation to database:", logError);
-        // Don't fail if logging doesn't work
       }
     }
   } catch (error) {

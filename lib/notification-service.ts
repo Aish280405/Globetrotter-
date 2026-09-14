@@ -107,7 +107,9 @@ export async function generateNotificationsForTrip(tripId: string) {
     );
 
     const location = trip.property_location || "Goa";
-    const phone = trip.user.email; // using email as placeholder; swap for phone field when available
+    // User has no phone-number field yet. Never submit an email address to the
+    // WhatsApp API; this must be populated from a real, verified phone number.
+    const phone = undefined;
 
     // --- PRE-TRIP notifications ---
     if (daysUntilCheckIn === 3) {

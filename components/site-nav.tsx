@@ -14,10 +14,10 @@ function NavContent() {
     // Fetch unread notification count
     const fetchUnreadCount = async () => {
       try {
-        const response = await fetch("/api/notifications/logs")
+        const response = await fetch("/api/notifications/unread-count")
         if (response.ok) {
           const data = await response.json()
-          setUnreadCount(data.length)
+          setUnreadCount(data.unreadCount || 0)
         }
       } catch (err) {
         // silently fail for nav badge
@@ -25,7 +25,7 @@ function NavContent() {
     }
 
     fetchUnreadCount()
-    const interval = setInterval(fetchUnreadCount, 60000)
+    const interval = setInterval(fetchUnreadCount, 30000) // Check every 30 seconds
     return () => clearInterval(interval)
   }, [])
 

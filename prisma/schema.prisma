@@ -273,6 +273,7 @@ model NotificationLog {
   message_type    MessageType
   message_content String
   status          NotificationStatus @default(QUEUED)
+  is_read         Boolean  @default(false)
   
   phone_number    String?
   scheduled_at    DateTime?
@@ -287,6 +288,7 @@ model NotificationLog {
   @@index([trip_id])
   @@index([status])
   @@index([scheduled_at])
+  @@index([is_read])
 }
 
 model ConversationHistory {

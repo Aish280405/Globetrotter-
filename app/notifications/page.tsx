@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Bell, CheckCircle, AlertCircle, Clock, Filter } from "lucide-react";
+import { Loader2, Bell, CheckCircle, AlertCircle, Clock, Filter, Check } from "lucide-react";
 
 interface NotificationLog {
   id: string;
@@ -12,6 +12,7 @@ interface NotificationLog {
   message_type: string;
   message_content: string;
   status: string;
+  is_read: boolean;
   sent_at: string;
   phone_number?: string;
 }
@@ -37,6 +38,7 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("ALL");
   const [error, setError] = useState<string | null>(null);
+  const [marking, setMarking] = useState(false);
 
   async function fetchNotifications() {
     try {
@@ -53,6 +55,41 @@ export default function NotificationsPage() {
     }
   }
 
+  async function markAsRead(notificationId: string) {
+    try {
+      const response = await fetch("/api/notifications/logs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId }),
+      });
+      if (response.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === notificationId ? { ...n, is_read: true } : n))
+        );
+      }
+    } catch (err) {
+      console.error("Error marking as read:", err);
+    }
+  }
+
+  async function markAllAsRead() {
+    try {
+      setMarking(true);
+      const response = await fetch("/api/notifications/logs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markAllAsRead: true }),
+      });
+      if (response.ok) {
+        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      }
+    } catch (err) {
+      console.error("Error marking all as read:", err);
+    } finally {
+      setMarking(false);
+    }
+  }
+
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
@@ -63,17 +100,33 @@ export default function NotificationsPage() {
     ? notifications
     : notifications.filter((n) => n.message_type === filter);
 
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
 
         {/* Header */}
-        <div className="mb-8 flex items-center gap-3">
-          <Bell className="h-7 w-7 text-primary" />
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
-            <p className="text-sm text-muted-foreground">Trip updates delivered automatically</p>
+        <div className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Bell className="h-7 w-7 text-primary" />
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">Notifications</h1>
+              <p className="text-sm text-muted-foreground">Trip updates delivered automatically</p>
+            </div>
           </div>
+          {unreadCount > 0 && (
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={markAllAsRead}
+              disabled={marking}
+              className="text-xs"
+            >
+              <Check className="mr-1 h-3 w-3" />
+              {marking ? "Marking..." : "Mark all read"}
+            </Button>
+          )}
         </div>
 
         {/* Filter Bar */}
@@ -129,7 +182,13 @@ export default function NotificationsPage() {
               {filtered.length} notification{filtered.length !== 1 ? "s" : ""}
             </p>
             {filtered.map((notif) => (
-              <Card key={notif.id} className="transition-shadow hover:shadow-md">
+              <Card 
+                key={notif.id} 
+                className={`transition-all cursor-pointer ${
+                  notif.is_read ? "opacity-60" : "hover:shadow-md border-l-2 border-l-primary"
+                }`}
+                onClick={() => !notif.is_read && markAsRead(notif.id)}
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
@@ -138,6 +197,9 @@ export default function NotificationsPage() {
                         <Badge className={`text-xs ${TYPE_COLOR[notif.message_type] ?? "bg-gray-100 text-gray-800"}`}>
                           {notif.message_type.charAt(0) + notif.message_type.slice(1).toLowerCase()}
                         </Badge>
+                        {notif.is_read && (
+                          <Badge variant="secondary" className="text-xs">Read</Badge>
+                        )}
                       </div>
                       <p className="text-sm text-foreground leading-relaxed">{notif.message_content}</p>
                       {notif.sent_at && (

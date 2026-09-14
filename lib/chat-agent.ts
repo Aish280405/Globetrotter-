@@ -326,6 +326,7 @@ export async function chat(
   try {
     // Classify intent
     const { intent, tools_needed } = await classifyUserIntent(userMessage);
+    console.log(`📌 Intent: ${intent}, Tools needed: ${tools_needed.join(", ")}`);
 
     // Prepare conversation context
     const messages = [
@@ -339,9 +340,28 @@ export async function chat(
     // Execute tool calls if needed
     let toolResults: Record<string, string> = {};
     for (const tool of tools_needed) {
-      // Extract parameters from user message (simplified)
-      const result = await executeToolCall(tool, { location: "", topic: "" });
-      toolResults[tool] = result;
+      try {
+        // Extract parameters from user message based on tool type
+        let params: Record<string, string> = {};
+
+        if (tool === "search_restaurants") {
+          // Extract location from message (simple heuristic)
+          const locationMatch = userMessage.match(
+            /(?:restaurant|food|eat|dining).*(?:in|at|near)\s+(\w+)/i
+          );
+          params.location = locationMatch ? locationMatch[1] : "Goa";
+        } else if (tool === "search_activities") {
+          const locationMatch = userMessage.match(/(?:in|at|near)\s+(\w+)/i);
+          params.location = locationMatch ? locationMatch[1] : "Goa";
+        }
+
+        const result = await executeToolCall(tool, params);
+        toolResults[tool] = result;
+        console.log(`✅ Tool ${tool} result: ${result.substring(0, 100)}...`);
+      } catch (toolError) {
+        console.error(`Error executing tool ${tool}:`, toolError);
+        toolResults[tool] = "Unable to fetch results";
+      }
     }
 
     // Build prompt with tool results
@@ -356,23 +376,26 @@ export async function chat(
         "\n\n";
     }
 
-    fullPrompt += `Previous conversation:\n${messages
+    fullPrompt += `Previous conversation (last 4 messages):\n${messages
       .slice(-4)
       .map((m) => `${m.role}: ${m.content}`)
-      .join("\n")}\n\nRespond naturally and helpfully. Do NOT use markdown formatting like **, *, or other symbols. Keep your response plain text.`;
+      .join("\n")}\n\nRespond naturally and helpfully. Do NOT use markdown formatting like **, *, or other symbols. Keep your response plain text and concise (under 150 characters for WhatsApp).`;
 
     const response = await model.generateContent(fullPrompt);
     let assistantMessage = response.response.text();
 
     // Clean up markdown formatting from response
     assistantMessage = assistantMessage
-      .replace(/\*\*/g, "") // Remove ** 
+      .replace(/\*\*/g, "") // Remove **
       .replace(/\*(?!\s)/g, "") // Remove * that aren't spaces
       .replace(/### /g, "") // Remove markdown headers
       .replace(/## /g, "")
       .replace(/# /g, "")
       .replace(/`/g, "") // Remove backticks
+      .replace(/\n/g, " ") // Convert newlines to spaces for WhatsApp
       .trim();
+
+    console.log(`💬 Generated response: "${assistantMessage}"`);
 
     return {
       message: assistantMessage,

@@ -12,6 +12,7 @@ import {
   MapPin,
   Sparkles,
   MessageSquare,
+  Check,
 } from "lucide-react";
 import TripChatbot from "@/components/TripChatbot";
 
@@ -39,7 +40,101 @@ function getMinDate(): string {
   return today.toISOString().split("T")[0];
 }
 
-export default function ConciergePage() {
+interface SaveToScheduleButtonProps {
+  tripId: string | null;
+  propertyLocation: string;
+  checkIn: string;
+  checkOut: string;
+  itinerary: {
+    days: ItineraryDay[];
+    general_tips: string[];
+    packing_suggestions: string[];
+    budget_estimate?: string;
+  };
+}
+
+function SaveToScheduleButton({
+  tripId,
+  propertyLocation,
+  checkIn,
+  checkOut,
+  itinerary,
+}: SaveToScheduleButtonProps) {
+  const [loading, setLoading] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    if (!tripId) {
+      setError("No trip ID available");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch("/api/trips/save-to-schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tripId,
+          propertyLocation,
+          checkIn,
+          checkOut,
+          itinerary,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to save to schedule");
+      }
+
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error saving to schedule");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (saved) {
+    return (
+      <div className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-800 rounded-lg">
+        <Check className="h-5 w-5" />
+        <span>Saved to My Schedule!</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        onClick={handleSave}
+        disabled={loading || !tripId}
+        variant="default"
+        size="lg"
+      >
+        {loading ? (
+          <>
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            Saving...
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-4 w-4 mr-2" />
+            Save to My Schedule
+          </>
+        )}
+      </Button>
+      {error && <span className="text-sm text-red-600">{error}</span>}
+    </div>
+  );
+}
+
+function ConciergePage() {
   const [propertyLocation, setPropertyLocation] = useState("Baga");
   const minDate = getMinDate();
   const [checkIn, setCheckIn] = useState(minDate);
@@ -256,6 +351,17 @@ export default function ConciergePage() {
           <TabsContent value="itinerary">
             {itinerary && (
               <div className="space-y-4">
+                {/* Save Button */}
+                <div className="flex justify-end">
+                  <SaveToScheduleButton 
+                    tripId={tripId}
+                    propertyLocation={propertyLocation}
+                    checkIn={checkIn}
+                    checkOut={checkOut}
+                    itinerary={itinerary}
+                  />
+                </div>
+
                 {/* Summary */}
                 <Card>
                   <CardHeader>
@@ -404,3 +510,5 @@ export default function ConciergePage() {
     </div>
   );
 }
+
+export default ConciergePage;

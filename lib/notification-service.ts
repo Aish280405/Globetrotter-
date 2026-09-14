@@ -63,7 +63,7 @@ export async function generateNotificationsForTrip(tripId: string) {
       notifications.push({
         tripId,
         phoneNumber: trip.user.email,
-        messageType: "LOGISTICS",
+        messageType: "logistics",
         content:
           notificationTemplates.checkin_tomorrow,
       });
@@ -74,7 +74,7 @@ export async function generateNotificationsForTrip(tripId: string) {
       notifications.push({
         tripId,
         phoneNumber: trip.user.email,
-        messageType: "LOGISTICS",
+        messageType: "logistics",
         content: notificationTemplates.checkin_today,
       });
     }
@@ -91,7 +91,7 @@ export async function generateNotificationsForTrip(tripId: string) {
         notifications.push({
           tripId,
           phoneNumber: trip.user.email,
-          messageType: "EVENT",
+          messageType: "event",
           content: notificationTemplates.event_weekend,
         });
       }
@@ -106,7 +106,7 @@ export async function generateNotificationsForTrip(tripId: string) {
       notifications.push({
         tripId,
         phoneNumber: trip.user.email,
-        messageType: "TIP",
+        messageType: "tip",
         content: tip,
       });
     }
@@ -118,7 +118,6 @@ export async function generateNotificationsForTrip(tripId: string) {
   }
 }
 
-// Send notification via WhatsApp or Email
 export async function sendNotification(
   payload: NotificationPayload
 ): Promise<boolean> {
@@ -127,7 +126,7 @@ export async function sendNotification(
     await prisma.notificationLog.create({
       data: {
         trip_id: payload.tripId,
-        message_type: payload.messageType as any,
+        message_type: payload.messageType.toUpperCase() as any,
         message_content: payload.content,
         phone_number: payload.phoneNumber,
         status: "SENT",
@@ -157,7 +156,7 @@ export async function sendNotification(
       await prisma.notificationLog.create({
         data: {
           trip_id: payload.tripId,
-          message_type: payload.messageType as any,
+          message_type: payload.messageType.toUpperCase() as any,
           message_content: payload.content,
           phone_number: payload.phoneNumber,
           status: "FAILED",

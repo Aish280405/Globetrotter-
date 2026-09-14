@@ -203,6 +203,26 @@ export default function LLMPage() {
           </p>
         </div>
 
+        {/* CTA Section */}
+        <Card className="mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <Globe className="h-8 w-8 text-blue-600 flex-shrink-0 mt-1" />
+              <div className="flex-1">
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  Want to go somewhere other than Goa?
+                </h2>
+                <p className="text-gray-700 mb-4">
+                  Generate a personalized travel plan for any destination. Just fill in your preferences below and let our AI create the perfect itinerary for you.
+                </p>
+                <p className="text-sm text-gray-600">
+                  ✨ Get custom recommendations • 📅 Detailed day-by-day plans • 💰 Budget breakdowns • 🎒 Packing lists
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Form */}
         <Card className="mb-8">
           <CardHeader>

@@ -20,8 +20,25 @@ type SearchResult = {
   lon: string;
 };
 
+interface Activity {
+  location: string;
+  title?: string;
+  time?: string;
+}
+
+interface ItineraryDay {
+  activities?: Activity[];
+  theme?: string;
+  date?: string;
+}
+
+interface Itinerary {
+  days?: ItineraryDay[];
+}
+
 interface MapViewProps {
   center: [number, number];
+  itinerary?: Itinerary;
 }
 
 function MapUpdater({ center, zoom = 13 }: { center: [number, number]; zoom?: number }) {
@@ -72,23 +89,89 @@ const TargetIcon = () => (
   </svg>
 );
 
-const cities = [
-  { name: 'Mumbai', coordinates: [19.076, 72.8777] as [number, number], number: 1 },
-  { name: 'Delhi', coordinates: [28.7041, 77.1025] as [number, number], number: 7 },
-  { name: 'Bangalore', coordinates: [12.9716, 77.5946] as [number, number], number: 13 },
-  { name: 'Chennai', coordinates: [13.0827, 80.2707] as [number, number], number: 19 },
-  { name: 'Kolkata', coordinates: [22.5726, 88.3639] as [number, number], number: 25 },
-];
+// Geocoding cache to avoid repeated API calls
+const geocodingCache: Record<string, [number, number] | null> = {};
 
-export default function MapView({ center }: MapViewProps) {
+export default function MapView({ center, itinerary }: MapViewProps) {
   const [mapCenter, setMapCenter] = useState<[number, number]>(center);
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<[number, number] | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [itineraryMarkers, setItineraryMarkers] = useState<Array<{ name: string; coords: [number, number]; number: number }>>([]);
 
   const searchTimer = useRef<number | null>(null);
+
+  // Extract unique locations from itinerary and geocode them
+  useEffect(() => {
+    const extractLocations = async () => {
+      if (!itinerary?.days) {
+        setItineraryMarkers([]);
+        return;
+      }
+
+      const uniqueLocations = new Set<string>();
+      itinerary.days.forEach((day) => {
+        if (day.activities) {
+          day.activities.forEach((activity) => {
+            if (activity.location) {
+              uniqueLocations.add(activity.location);
+            }
+          });
+        }
+      });
+
+      if (uniqueLocations.size === 0) {
+        setItineraryMarkers([]);
+        return;
+      }
+
+      // Geocode locations
+      const markers: Array<{ name: string; coords: [number, number]; number: number }> = [];
+      let markerNumber = 1;
+
+      for (const location of uniqueLocations) {
+        // Check cache first
+        if (location in geocodingCache) {
+          const coords = geocodingCache[location];
+          if (coords) {
+            markers.push({ name: location, coords, number: markerNumber++ });
+          }
+        } else {
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`,
+              { signal: controller.signal }
+            );
+            clearTimeout(timeoutId);
+
+            if (!res.ok) {
+              throw new Error(`HTTP ${res.status}`);
+            }
+            const data: SearchResult[] = await res.json();
+            if (data && data.length > 0) {
+              const coords: [number, number] = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+              geocodingCache[location] = coords;
+              markers.push({ name: location, coords, number: markerNumber++ });
+            } else {
+              geocodingCache[location] = null;
+            }
+          } catch (error) {
+            console.warn(`Error geocoding ${location}:`, error);
+            geocodingCache[location] = null;
+          }
+        }
+      }
+
+      setItineraryMarkers(markers);
+    };
+
+    extractLocations();
+  }, [itinerary]);
 
   // Update map center if parent center changes
   useEffect(() => {
@@ -164,10 +247,10 @@ export default function MapView({ center }: MapViewProps) {
 
         <MapUpdater center={mapCenter} zoom={13} />
 
-        {cities.map((city) => (
+        {itineraryMarkers.map((marker) => (
           <Marker
-            key={city.name}
-            position={city.coordinates}
+            key={marker.name}
+            position={marker.coords}
             icon={L.divIcon({
               className: 'custom-city-marker',
               html: `
@@ -186,7 +269,7 @@ export default function MapView({ center }: MapViewProps) {
                   box-shadow: 0 2px 4px rgba(0,0,0,0.3);
                   cursor: pointer;
                 ">
-                  ${city.number}
+                  ${marker.number}
                 </div>
               `,
               iconSize: [30, 30],
@@ -195,9 +278,9 @@ export default function MapView({ center }: MapViewProps) {
           >
             <Popup>
               <div style={{ textAlign: 'center' }}>
-                <strong>{city.name}</strong>
+                <strong>{marker.name}</strong>
                 <br />
-                City #{city.number}
+                Location #{marker.number}
               </div>
             </Popup>
           </Marker>

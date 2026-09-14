@@ -171,7 +171,17 @@ export async function POST(req: NextRequest) {
       const params = new URLSearchParams(text);
 
       const signature = req.headers.get("x-twilio-signature");
-      const webhookUrl = process.env.TWILIO_WEBHOOK_URL;
+      const forwardedHost =
+        req.headers.get("x-forwarded-host") || req.headers.get("host");
+      const forwardedProtocol = req.headers.get("x-forwarded-proto") || "https";
+      // TWILIO_WEBHOOK_URL is optional. On Vercel derive the public URL that
+      // Twilio signed, so a missing environment variable does not reject all
+      // inbound Sandbox messages.
+      const webhookUrl =
+        process.env.TWILIO_WEBHOOK_URL ||
+        (forwardedHost
+          ? `${forwardedProtocol}://${forwardedHost}${req.nextUrl.pathname}`
+          : undefined);
       if (!signature || !webhookUrl || !process.env.TWILIO_AUTH_TOKEN) {
         console.warn("Rejected Twilio webhook: signature verification is not configured");
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

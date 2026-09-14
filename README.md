@@ -1,4 +1,4 @@
 
-Deploy Link: https://globe-trotter-4n4v.vercel.app/
+Deploy Link: https://globetrotter-ten-omega.vercel.app/
 
 

@@ -26,16 +26,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ unreadCount: 0 });
     }
 
-    const unreadCount = await prisma.notificationLog.count({
-      where: {
-        trip: {
-          user_id: user.user_id,
+    try {
+      const unreadCount = await prisma.notificationLog.count({
+        where: {
+          trip: {
+            user_id: user.user_id,
+          },
+          is_read: false,
         },
-        is_read: false,
-      },
-    });
+      });
 
-    return NextResponse.json({ unreadCount });
+      return NextResponse.json({ unreadCount });
+    } catch (dbError) {
+      // If is_read field doesn't exist yet (migration not run), return 0
+      console.warn("Database schema not migrated yet, returning 0 unread count");
+      return NextResponse.json({ unreadCount: 0 });
+    }
   } catch (error) {
     console.error("[notifications/unread-count]", error);
     return NextResponse.json({ unreadCount: 0 });

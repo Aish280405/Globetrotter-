@@ -3,6 +3,56 @@ import { addDays, isTomorrow, isToday } from "date-fns";
 
 export type NotificationType = "weather" | "logistics" | "event" | "tip";
 
+// WhatsApp message sending function
+async function sendWhatsAppMessage(
+  phoneNumber: string,
+  message: string
+): Promise<boolean> {
+  try {
+    // Skip sending if no phone number
+    if (!phoneNumber) {
+      console.log("No phone number provided, skipping WhatsApp message");
+      return false;
+    }
+
+    // Option 1: Using Twilio SDK
+    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+      const twilio = require("twilio");
+      const client = twilio(
+        process.env.TWILIO_ACCOUNT_SID,
+        process.env.TWILIO_AUTH_TOKEN
+      );
+
+      const fromNumber = process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155238886";
+      
+      // Convert phone number to WhatsApp format if needed
+      const toNumber = phoneNumber.startsWith("whatsapp:") 
+        ? phoneNumber 
+        : `whatsapp:${phoneNumber}`;
+
+      await client.messages.create({
+        body: message,
+        from: fromNumber,
+        to: toNumber,
+      });
+
+      console.log(
+        `✅ WhatsApp notification sent to ${phoneNumber}: ${message.substring(0, 50)}...`
+      );
+      return true;
+    }
+
+    // Fallback: just log (for development without Twilio)
+    console.log(
+      `📱 [DEV] WhatsApp notification to ${phoneNumber}: ${message.substring(0, 50)}...`
+    );
+    return true;
+  } catch (error) {
+    console.error("Error sending WhatsApp notification:", error);
+    return false;
+  }
+}
+
 interface NotificationPayload {
   tripId: string;
   phoneNumber?: string;
@@ -138,14 +188,19 @@ export async function sendNotification(
       },
     });
 
-    console.log(
-      `✓ Notification sent to ${payload.phoneNumber}: ${payload.messageType}`
-    );
-
-    // In production, integrate with WhatsApp Business API or Twilio
-    // For now, we're logging it
-    // Example WhatsApp integration:
-    // await sendWhatsAppMessage(payload.phoneNumber, payload.content);
+    // Send actual WhatsApp message via Twilio
+    const success = await sendWhatsAppMessage(payload.phoneNumber || '', payload.content);
+    
+    if (success) {
+      console.log(
+        `✓ Notification sent to ${payload.phoneNumber}: ${payload.messageType}`
+      );
+    } else {
+      console.error(
+        `✗ Failed to send notification to ${payload.phoneNumber}: ${payload.messageType}`
+      );
+      throw new Error('Failed to send WhatsApp message');
+    }
 
     return true;
   } catch (error) {

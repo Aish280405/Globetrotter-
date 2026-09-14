@@ -16,12 +16,14 @@ export const redisConnectionOptions: RedisOptions = {
   password: process.env.REDIS_PASSWORD || undefined,
   username: process.env.REDIS_USERNAME || 'default',
   tls: hostUrl?.protocol === 'https:' || hostUrl?.protocol === 'rediss:' ? {} : undefined,
-  maxRetriesPerRequest: null,
+  // Cache reads must never hold a web request open while Redis reconnects.
+  maxRetriesPerRequest: 1,
   // Next.js imports route modules while generating static pages on Vercel.
   // Do not open a TCP socket at import time; the first Redis command connects.
   lazyConnect: true,
-  enableOfflineQueue: true,
+  enableOfflineQueue: false,
   connectTimeout: 5000,
+  commandTimeout: 5000,
   retryStrategy: (times) => {
     const delay = Math.min(times * 50, 2000);
     return delay;

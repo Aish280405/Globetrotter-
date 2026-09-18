@@ -7,10 +7,14 @@ import { runNotificationCronJob } from "@/lib/notification-service";
 export async function GET(req: NextRequest) {
   try {
     // Simple security check - use an environment variable for the secret
-    const crownKey = req.nextUrl.searchParams.get("key");
+    const queryKey = req.nextUrl.searchParams.get("key");
     const secretKey = process.env.CRON_SECRET;
+    const authorization = req.headers.get("authorization");
+    const isAuthorized =
+      !!secretKey &&
+      (queryKey === secretKey || authorization === `Bearer ${secretKey}`);
 
-    if (!secretKey || crownKey !== secretKey) {
+    if (!isAuthorized) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

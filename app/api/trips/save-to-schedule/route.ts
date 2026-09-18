@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import prisma from "@/lib/prisma";
+import { sendNotification } from "@/lib/notification-service";
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,6 +52,13 @@ export async function POST(req: NextRequest) {
       data: { phone_number: normalizedPhone },
     });
 
+    // Send the confirmation only for a newly created schedule entry. Re-saving
+    // an itinerary updates the trip without sending duplicate WhatsApp alerts.
+    const existingTrip = await prisma.tripConcierge.findUnique({
+      where: { id: tripId },
+      select: { id: true },
+    });
+
     // Update or create trip_concierge record
     const trip = await prisma.tripConcierge.upsert({
       where: { id: tripId },
@@ -70,10 +78,29 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    let confirmationSent = false;
+    if (!existingTrip) {
+      const checkInDate = new Date(checkIn).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+      });
+      const checkOutDate = new Date(checkOut).toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "short",
+      });
+      confirmationSent = await sendNotification({
+        tripId: trip.id,
+        phoneNumber: normalizedPhone,
+        messageType: "logistics",
+        content: `Your ${propertyLocation} trip is saved for ${checkInDate} to ${checkOutDate}. Your GlobeTrotter concierge will send timely updates here.`,
+      });
+    }
+
     return NextResponse.json({
       success: true,
       trip_id: trip.id,
       message: "Trip saved to My Schedule",
+      confirmationSent,
     });
   } catch (error) {
     console.error("[trips/save-to-schedule]", error);
